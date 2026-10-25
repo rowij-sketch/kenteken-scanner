@@ -37,3 +37,8 @@ Kopieer de hele map naar een webserver die statische bestanden serveert over HTT
 - `.wasm.js`-bestanden als `application/javascript` serveren en `.gz` **zonder** `Content-Encoding: gzip`. Tesseract pakt `eng.traineddata.gz` zelf uit.
 - Bij een Content-Security-Policy moeten deze waarden zijn toegestaan: `script-src 'self' 'wasm-unsafe-eval'`, `worker-src 'self' blob:`, `connect-src 'self' https://opendata.rdw.nl` en `img-src 'self' blob: data:`.
 - Lange cache voor `vendor/` (ongeveer 10 MB, verandert zelden), korte cache voor de rest.
+
+## Live: kenteken.newro.nl (VPS20)
+
+- Uitgerold vanaf een vast commit. Welk commit live staat, staat in `versie.json` in de releasemap. Een nieuwe versie gaat live door het nieuwe commit-hash door te geven aan het VPS20-beheer.
+- **Camera:** de server stuurt `Permissions-Policy: camera=()`. Dat is goed zolang de app de bestandskiezer gebruikt (`<input type="file" capture>`), want die opent de camera-app van het toestel en valt niet onder dat beleid. Stapt de app over op `getUserMedia` (bijvoorbeeld voor een live camerabeeld), dan blokkeert die kop de camera zonder duidelijke foutmelding. Laat de server dan eerst `camera=(self)` zetten.
