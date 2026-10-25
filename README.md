@@ -1,0 +1,39 @@
+# Kenteken Scanner
+
+Webapp die een Nederlands kenteken van een foto leest en de voertuiggegevens ophaalt uit de open data van de RDW.
+
+- Werkt voor iedereen zonder account of API-sleutel, op telefoon (camera) en computer (foto kiezen of typen).
+- De foto wordt alleen in de browser gelezen (Tesseract.js). Alleen het kenteken gaat naar `opendata.rdw.nl`.
+- Volledig statisch: geen server-code, geen build-stap. Tesseract.js, de WebAssembly-kern en de Engelse taaldata staan in `vendor/`, dus er is geen afhankelijkheid van een externe CDN.
+- Deelbare links: `/?kenteken=GX434R` zoekt direct op.
+
+## Hoe het werkt
+
+1. Foto inladen en verkleinen tot max. 1600 px.
+2. Het grootste gele, langwerpige vlak zoeken (de kentekenplaat) en uitsnijden. De gebruiker kan ook zelf een kader slepen.
+3. Uitsnede naar zwart-wit (Otsu) en OCR als één regel. Lukt dat niet, dan wordt de hele foto doorzocht.
+4. `plate.js` maakt van de OCR-tekst kandidaten die passen op de Nederlandse sidecodes en corrigeert verwisselingen als 0/D en 8/B.
+5. Alle kandidaten in één verzoek opzoeken bij de RDW (`m9d7-ebf2`). De eerste die bestaat wordt getoond, aangevuld met brandstof en uitstoot (`8ys7-d773`).
+
+## Lokaal draaien
+
+```sh
+cd kenteken-scanner
+python3 -m http.server 8000
+```
+
+Open daarna http://localhost:8000. De camera-knop werkt op een telefoon alleen via HTTPS of localhost.
+
+## Tests
+
+```sh
+node --test kenteken-scanner/tests/plate.test.js
+```
+
+## Uitrol
+
+Kopieer de hele map naar een webserver die statische bestanden serveert over HTTPS. Aandachtspunten:
+
+- `.wasm.js`-bestanden als `application/javascript` serveren en `.gz` **zonder** `Content-Encoding: gzip`. Tesseract pakt `eng.traineddata.gz` zelf uit.
+- Bij een Content-Security-Policy moeten deze waarden zijn toegestaan: `script-src 'self' 'wasm-unsafe-eval'`, `worker-src 'self' blob:`, `connect-src 'self' https://opendata.rdw.nl` en `img-src 'self' blob: data:`.
+- Lange cache voor `vendor/` (ongeveer 10 MB, verandert zelden), korte cache voor de rest.
