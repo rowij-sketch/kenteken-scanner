@@ -21,7 +21,8 @@
   };
 
   let photo = null;   // canvas met de (verkleinde) foto
-  let box = null;     // {x, y, w, h} in foto-pixels: waar het kenteken staat
+  let plate = null;   // gevonden plaat: {cx, cy, len, thick, angle} in foto-pixels
+  let box = null;     // kader dat de gebruiker sleept: {x, y, w, h}
   let workerPromise = null;
   let scanId = 0;     // om verouderde scans te negeren als er snel opnieuw gescand wordt
 
@@ -94,128 +95,6 @@
     return c;
   }
 
-  // ---------- kenteken vinden: het grootste gele, langwerpige vlak ----------
-
-  function findPlate(src) {
-    const W = 320;
-    const scale = W / src.width;
-    const H = Math.max(1, Math.round(src.height * scale));
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(src, 0, 0, W, H);
-    const px = ctx.getImageData(0, 0, W, H).data;
-
-    const yellow = new Uint8Array(W * H);
-    for (let i = 0; i < W * H; i++) {
-      const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      if (max < 90 || max - min < 0.35 * max) continue;
-      let h;
-      if (max === r) h = 60 * (((g - b) / (max - min)) % 6);
-      else if (max === g) h = 60 * ((b - r) / (max - min) + 2);
-      else continue;
-      if (h >= 30 && h <= 70) yellow[i] = 1;
-    }
-
-    const seen = new Uint8Array(W * H);
-    const stack = [];
-    let best = null;
-    for (let start = 0; start < W * H; start++) {
-      if (!yellow[start] || seen[start]) continue;
-      let minX = W, minY = H, maxX = 0, maxY = 0, count = 0;
-      stack.push(start);
-      seen[start] = 1;
-      while (stack.length) {
-        const p = stack.pop();
-        const x = p % W, y = (p - x) / W;
-        count++;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        if (x > 0 && yellow[p - 1] && !seen[p - 1]) { seen[p - 1] = 1; stack.push(p - 1); }
-        if (x < W - 1 && yellow[p + 1] && !seen[p + 1]) { seen[p + 1] = 1; stack.push(p + 1); }
-        if (y > 0 && yellow[p - W] && !seen[p - W]) { seen[p - W] = 1; stack.push(p - W); }
-        if (y < H - 1 && yellow[p + W] && !seen[p + W]) { seen[p + W] = 1; stack.push(p + W); }
-      }
-      const w = maxX - minX + 1, h = maxY - minY + 1;
-      const ratio = w / h;
-      const fill = count / (w * h);
-      if (count < 40 || ratio < 1.8 || ratio > 7 || fill < 0.35) continue;
-      if (!best || count > best.count) best = { x: minX, y: minY, w, h, count };
-    }
-    if (!best) return null;
-
-    // Iets ruimer nemen zodat randletters niet worden afgesneden.
-    const padX = best.w * 0.04, padY = best.h * 0.12;
-    const x = Math.max(0, (best.x - padX) / scale);
-    const y = Math.max(0, (best.y - padY) / scale);
-    return {
-      x, y,
-      w: Math.min(src.width - x, (best.w + 2 * padX) / scale),
-      h: Math.min(src.height - y, (best.h + 2 * padY) / scale),
-    };
-  }
-
-  // ---------- voorbewerking voor OCR ----------
-
-  function prepareCrop(src, area) {
-    const targetH = 140;
-    const scale = targetH / area.h;
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(area.w * scale));
-    c.height = targetH;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(src, area.x, area.y, area.w, area.h, 0, 0, c.width, c.height);
-
-    const img = ctx.getImageData(0, 0, c.width, c.height);
-    const d = img.data;
-    const gray = new Uint8Array(c.width * c.height);
-    const hist = new Uint32Array(256);
-    for (let i = 0; i < gray.length; i++) {
-      const v = Math.round(0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]);
-      gray[i] = v;
-      hist[v]++;
-    }
-    const t = otsu(hist, gray.length);
-    for (let i = 0; i < gray.length; i++) {
-      const v = gray[i] > t ? 255 : 0;
-      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
-      d[i * 4 + 3] = 255;
-    }
-    ctx.putImageData(img, 0, 0);
-
-    // Witte rand helpt Tesseract bij tekst die tot de rand loopt.
-    const out = document.createElement('canvas');
-    out.width = c.width + 40;
-    out.height = c.height + 40;
-    const octx = out.getContext('2d');
-    octx.fillStyle = '#fff';
-    octx.fillRect(0, 0, out.width, out.height);
-    octx.drawImage(c, 20, 20);
-    return out;
-  }
-
-  function otsu(hist, total) {
-    let sum = 0;
-    for (let i = 0; i < 256; i++) sum += i * hist[i];
-    let sumB = 0, wB = 0, best = 0, threshold = 127;
-    for (let i = 0; i < 256; i++) {
-      wB += hist[i];
-      if (!wB) continue;
-      const wF = total - wB;
-      if (!wF) break;
-      sumB += i * hist[i];
-      const mB = sumB / wB, mF = (sum - sumB) / wF;
-      const between = wB * wF * (mB - mF) * (mB - mF);
-      if (between > best) { best = between; threshold = i; }
-    }
-    return threshold;
-  }
-
   // ---------- preview met sleepbaar kader ----------
 
   function drawPreview() {
@@ -224,11 +103,20 @@
     c.height = photo.height;
     const ctx = c.getContext('2d');
     ctx.drawImage(photo, 0, 0);
+    ctx.lineWidth = Math.max(3, photo.width / 200);
     if (box) {
-      const lw = Math.max(3, photo.width / 200);
-      ctx.lineWidth = lw;
-      ctx.strokeStyle = '#00e676';
+      ctx.strokeStyle = '#ffffff';
+      ctx.setLineDash([12, 8]);
       ctx.strokeRect(box.x, box.y, box.w, box.h);
+      ctx.setLineDash([]);
+    }
+    if (plate) {
+      ctx.save();
+      ctx.translate(plate.cx, plate.cy);
+      ctx.rotate(plate.angle);
+      ctx.strokeStyle = '#00e676';
+      ctx.strokeRect(-plate.len / 2, -plate.thick / 2, plate.len, plate.thick);
+      ctx.restore();
     }
   }
 
@@ -249,6 +137,7 @@
   els.canvas.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const p = canvasPoint(e);
+    plate = null;
     box = {
       x: Math.min(drag.x, p.x),
       y: Math.min(drag.y, p.y),
@@ -260,8 +149,11 @@
   const endDrag = () => {
     if (!drag) return;
     drag = null;
-    if (box && box.w > 20 && box.h > 8) scan();
-    else {
+    if (box && box.w > 20 && box.h > 8) {
+      plate = Vision.findPlate(photo, box);
+      drawPreview();
+      scan();
+    } else {
       box = null;
       drawPreview();
     }
@@ -277,6 +169,7 @@
     if (!file) return;
     els.result.hidden = true;
     els.candidates.hidden = true;
+    els.input.value = '';
     setStatus('Foto laden…');
     try {
       photo = toCanvas(await loadImage(file));
@@ -284,7 +177,8 @@
       setStatus(err.message, true);
       return;
     }
-    box = findPlate(photo);
+    box = null;
+    plate = Vision.findPlate(photo);
     els.preview.hidden = false;
     drawPreview();
     scan();
@@ -299,17 +193,21 @@
       if (id !== scanId) return;
       setStatus('Kenteken lezen…');
 
-      let text = '';
-      if (box) {
-        await worker.setParameters({ tessedit_pageseg_mode: '7' }); // één regel
-        text = (await worker.recognize(prepareCrop(photo, box))).data.text;
+      // Elke variant van de plaat lezen; kandidaten van de zekerste lezing eerst.
+      const variants = plate ? Vision.plateVariants(photo, plate) : box ? [Vision.regionVariant(photo, box)] : [];
+      const reads = [];
+      await worker.setParameters({ tessedit_pageseg_mode: '7' }); // één regel
+      for (const v of variants) {
+        const { data } = await worker.recognize(v);
+        if (id !== scanId) return;
+        reads.push({ found: Plate.candidates(data.text), conf: data.confidence });
       }
-      let found = Plate.candidates(text);
-      if (!found.length) {
+      reads.sort((x, y) => y.conf - x.conf);
+      let found = [...new Set(reads.flatMap((r) => r.found))];
+      if (!found.length && !box) {
         // Geen plaat gevonden of niets leesbaars: hele foto doorzoeken op losse tekst.
         await worker.setParameters({ tessedit_pageseg_mode: '11' });
-        text = (await worker.recognize(photo)).data.text;
-        found = Plate.candidates(text);
+        found = Plate.candidates((await worker.recognize(photo)).data.text);
       }
       if (id !== scanId) return;
       setProgress(null);

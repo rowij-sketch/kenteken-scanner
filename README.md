@@ -10,10 +10,11 @@ Webapp die een Nederlands kenteken van een foto leest en de voertuiggegevens oph
 ## Hoe het werkt
 
 1. Foto inladen en verkleinen tot max. 1600 px.
-2. Het grootste gele, langwerpige vlak zoeken (de kentekenplaat) en uitsnijden. De gebruiker kan ook zelf een kader slepen.
-3. Uitsnede naar zwart-wit (Otsu) en OCR als één regel. Lukt dat niet, dan wordt de hele foto doorzocht.
-4. `plate.js` maakt van de OCR-tekst kandidaten die passen op de Nederlandse sidecodes en corrigeert verwisselingen als 0/D en 8/B.
-5. Alle kandidaten in één verzoek opzoeken bij de RDW (`m9d7-ebf2`). De eerste die bestaat wordt getoond, aangevuld met brandstof en uitstoot (`8ys7-d773`).
+2. `vision.js` zoekt het grootste gele, langwerpige vlak (de kentekenplaat) en bepaalt de hoek daarvan. De gebruiker kan ook zelf een kader slepen; daarbinnen wordt opnieuw naar de gele plaat gezocht.
+3. De plaat wordt rechtgezet en naar zwart-wit omgezet, op twee manieren (Otsu en een geelmasker). Alleen vlekken met de vorm van letters, cijfers en streepjes blijven over, zodat de blauwe NL-strook en de plaatrand wegvallen. De schuine stand van de letters (door perspectief) wordt rechtgetrokken.
+4. Beide varianten gaan als één regel door de OCR; de kandidaten van de zekerste lezing komen eerst. Lukt het niet, dan wordt de hele foto doorzocht.
+5. `plate.js` maakt van de OCR-tekst kandidaten die passen op de Nederlandse sidecodes en corrigeert verwisselingen als 0/D en 8/B.
+6. Alle kandidaten in één verzoek opzoeken bij de RDW (`m9d7-ebf2`). De eerste die bestaat wordt getoond, aangevuld met brandstof en uitstoot (`8ys7-d773`).
 
 ## Lokaal draaien
 
