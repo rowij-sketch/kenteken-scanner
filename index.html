@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kenteken Scanner</title>
+  <meta name="description" content="Maak een foto van een Nederlands kenteken en bekijk direct de voertuiggegevens uit de open data van de RDW.">
+  <meta name="theme-color" content="#f7b500">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <h1>Kenteken Scanner</h1>
+      <p class="lead">Maak een foto van een kenteken of typ het in. De gegevens komen uit de open data van de RDW.</p>
+    </header>
+
+    <section class="card" aria-labelledby="scan-title">
+      <h2 id="scan-title" class="visually-hidden">Kenteken invoeren</h2>
+
+      <div class="photo-buttons">
+        <label class="btn btn-primary">
+          <!-- Bestandskiezer, geen getUserMedia: de server zet Permissions-Policy camera=(). Zie README. -->
+          <input id="camera-input" type="file" accept="image/*" capture="environment" class="visually-hidden">
+          <span aria-hidden="true">📷</span> Foto maken
+        </label>
+        <label class="btn">
+          <input id="file-input" type="file" accept="image/*" class="visually-hidden">
+          <span aria-hidden="true">🖼️</span> Foto kiezen
+        </label>
+      </div>
+
+      <figure id="preview" class="preview" hidden>
+        <canvas id="preview-canvas" aria-label="Je foto. Sleep een kader om het kenteken als de herkenning niet klopt."></canvas>
+        <figcaption>Klopt het niet? Sleep een kader om het kenteken heen, dan lees ik opnieuw.</figcaption>
+      </figure>
+
+      <form id="plate-form" class="plate-form" autocomplete="off">
+        <label for="plate-input" class="plate-label">Kenteken</label>
+        <div class="plate">
+          <span class="plate-eu" aria-hidden="true">NL</span>
+          <input id="plate-input" name="kenteken" class="plate-input" inputmode="text" autocapitalize="characters"
+                 spellcheck="false" maxlength="8" placeholder="XX-999-X" aria-describedby="status">
+        </div>
+        <button type="submit" class="btn btn-primary">Opzoeken</button>
+      </form>
+
+      <div id="candidates" class="candidates" hidden>
+        <span>Bedoel je:</span>
+        <div id="candidate-list" class="chip-row"></div>
+      </div>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <progress id="progress" max="1" value="0" hidden></progress>
+    </section>
+
+    <section id="result" class="card result" hidden aria-live="polite"></section>
+
+    <footer class="foot">
+      <p>Je foto wordt alleen op je eigen toestel gelezen en nergens naartoe gestuurd. Alleen het kenteken gaat naar de RDW.</p>
+      <p>Bron: <a href="https://opendata.rdw.nl" rel="noopener">RDW Open Data</a>. Tekstherkenning met Tesseract.js.</p>
+    </footer>
+  </main>
+
+  <script src="plate.js"></script>
+  <script src="vision.js"></script>
+  <script src="vendor/tesseract.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
