@@ -19,7 +19,7 @@ Webapp die een Nederlands kenteken van een foto leest en de voertuiggegevens oph
 ## Lokaal draaien
 
 ```sh
-cd kenteken-scanner
+cd kenteken-scanner  # de map van deze repository
 python3 -m http.server 8000
 ```
 
@@ -28,7 +28,7 @@ Open daarna http://localhost:8000. De camera-knop werkt op een telefoon alleen v
 ## Tests
 
 ```sh
-node --test kenteken-scanner/tests/plate.test.js
+node --test tests/plate.test.js
 ```
 
 ## Uitrol
@@ -41,5 +41,5 @@ Kopieer de hele map naar een webserver die statische bestanden serveert over HTT
 
 ## Live: kenteken.newro.nl (VPS20)
 
-- Uitgerold vanaf een vast commit. Welk commit live staat, staat in `versie.json` in de releasemap. Een nieuwe versie gaat live door het nieuwe commit-hash door te geven aan het VPS20-beheer.
+- Uitgerold vanaf een vast commit van deze repository (`rowij-sketch/kenteken-scanner`). Welk commit live staat, staat in `versie.json` in de releasemap. Een nieuwe versie gaat live door het nieuwe commit-hash door te geven aan het VPS20-beheer.
 - **Camera:** de server stuurt `Permissions-Policy: camera=()`. Dat is goed zolang de app de bestandskiezer gebruikt (`<input type="file" capture>`), want die opent de camera-app van het toestel en valt niet onder dat beleid. Stapt de app over op `getUserMedia` (bijvoorbeeld voor een live camerabeeld), dan blokkeert die kop de camera zonder duidelijke foutmelding. Laat de server dan eerst `camera=(self)` zetten.

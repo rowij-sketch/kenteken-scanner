@@ -1,4 +1,4 @@
-// Run: node --test kenteken-scanner/tests/plate.test.js
+// Run: node --test tests/plate.test.js
 const test = require('node:test');
 const assert = require('node:assert');
 const Plate = require('../plate.js');
